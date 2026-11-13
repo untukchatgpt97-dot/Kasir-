@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Smart Kasir Pro</title>
+<style>
+:root{--g:#1b5e20;--g2:#2e7d32;--bg:#f4f6f4;--c:#fff;--t:#1a1c1a;--m:#5f6661;--ln:#dfe4df;--er:#b3261e;--wn:#b26a00;--on:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--g:#7bd480;--g2:#5cb862;--bg:#121512;--c:#1c201c;--t:#e8ece8;--m:#9aa39b;--ln:#2b312b;--er:#ff8a80;--wn:#ffb74d;--on:#0b1f0d}}
+:root[data-theme=dark]{--g:#7bd480;--g2:#5cb862;--bg:#121512;--c:#1c201c;--t:#e8ece8;--m:#9aa39b;--ln:#2b312b;--er:#ff8a80;--wn:#ffb74d;--on:#0b1f0d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{padding:14px 14px 150px;max-width:640px;margin:0 auto}
+h1{font-size:1.4rem;margin:0 0 10px;color:var(--g)}h2{font-size:1rem;margin:14px 0 6px}
+.c{background:var(--c);border-radius:14px;padding:12px;margin-bottom:10px;border:1px solid var(--ln)}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}.g .c{margin:0}
+.k{color:var(--m);font-size:.82rem}.v{font-size:1.2rem;font-weight:700;color:var(--g)}.big{font-size:2.1rem;font-weight:800;color:var(--g)}.lo{color:var(--er)}
+.r{display:flex;align-items:center;gap:8px}.f{flex:1;min-width:0}.sb{justify-content:space-between}
+button,input,select{font:inherit}
+button{min-height:52px;border:0;border-radius:12px;padding:0 16px;background:var(--g);color:var(--on);font-weight:700;cursor:pointer}
+button.o{background:transparent;color:var(--g);border:1.5px solid var(--g)}button.d{background:var(--er);color:#fff}
+button.s{min-height:46px;min-width:46px;padding:0 10px}button:disabled{opacity:.4}
+input,select{width:100%;min-height:50px;border:1.5px solid var(--ln);border-radius:10px;padding:0 12px;background:var(--c);color:var(--t);margin:4px 0 8px}
+label{font-size:.85rem;color:var(--m)}.w{width:100%}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--c);border-top:1px solid var(--ln);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;min-height:60px;background:none;color:var(--m);border-radius:0;font-size:.78rem;padding:0}nav button.on{color:var(--g);box-shadow:inset 0 3px var(--g)}
+.fx{position:fixed;left:14px;right:14px;bottom:calc(70px + env(safe-area-inset-bottom,0px));max-width:612px;margin:0 auto}
+dialog{border:0;border-radius:18px;padding:16px;width:min(94vw,520px);max-height:90vh;background:var(--c);color:var(--t)}dialog::backdrop{background:#0008}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+#rcp{display:none}@media print{body>*{display:none!important}#rcp{display:block!important;white-space:pre;font:12px monospace;color:#000}@page{margin:2mm}}
+</style></head><body>
+<main id="app"></main><nav id="nv"></nav><dialog id="dl"></dialog><pre id="rcp"></pre>
+<script>
+const E=s=>document.querySelector(s),$$=(s,f)=>document.querySelectorAll(s).forEach(f);
+function uid(){return crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2,10)}
+const R=n=>(n<0?'-':'')+'Rp'+Math.abs(Math.round(n)).toLocaleString('id-ID');
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+const day=t=>new Date(t).toLocaleDateString('sv-SE',{timeZone:'Asia/Jakarta'});
+const dt=t=>new Date(t).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'medium',timeStyle:'short'});
+const iso=t=>new Date(t+252e5).toISOString().replace('Z','+07:00');
+const sum=(a,k)=>a.reduce((x,y)=>x+(y[k]||0),0);
+let mem=null;
+function load(){try{return JSON.parse(localStorage.getItem('skp'))||mem}catch(e){return mem}}
+function save(){mem=D;try{localStorage.setItem('skp',JSON.stringify(D))}catch(e){}}
+let D=load()||{dev:uid().slice(0,4).toUpperCase(),shop:'',users:[],cats:['Makanan','Minuman','Rokok','Sembako','Peralatan rumah tangga','Produk kebersihan','Obat-obatan bebas','Lain-lain'],prod:[],sales:[],mov:[],q:[],log:[]};D.tg=D.tg||{tok:'',chat:''};D.tq=D.tq||[];D.qris=D.qris||'';D.wa=D.wa||{url:'https://api.fonnte.com/send',tok:'',to:''};D.wq=D.wq||[];
+let U=null,tab='home',cart=[],disc=0,paid=0,q='',sid=null,msg='',fails=0,lock=0,wno='',wm='',tm='',pm='CASH';
+const lg=(a,d)=>D.log.push({id:uid(),u:U&&U.id,a,d,t:Date.now(),dev:D.dev});
+async function hp(p,s){try{const e=new TextEncoder(),k=await crypto.subtle.importKey('raw',e.encode(p),'PBKDF2',false,['deriveBits']),b=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:e.encode(s),iterations:50000},k,256);return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){let h=5381;for(const c of s+p)h=(h*33^c.charCodeAt(0))>>>0;return'f'+h}}
+const own=()=>U&&U.role=='owner';
+const sub=()=>cart.reduce((a,l)=>a+l.q*l.p,0),tot=()=>Math.max(0,sub()-disc);
+const hd=t=>`<h1>${t}</h1>`;
+function auth(){return D.users.length?hd('Smart Kasir Pro')+`<p class=k>Kasir warung yang tetap jalan tanpa internet</p><label>Siapa yang memakai kasir?</label><select id=lu>${D.users.map(u=>`<option value="${u.id}">${esc(u.name)} (${u.role=='owner'?'pemilik':'kasir'})</option>`).join('')}</select><label>PIN</label><input id=lp type=password inputmode=numeric maxlength=6 autocomplete=off><p class=lo>${esc(msg)}</p><button class=w data-a=login>Masuk</button>`
+:hd('Smart Kasir Pro')+`<p class=k>Buat akun pemilik. PIN dipakai setiap kali membuka aplikasi.</p><label>Nama pemilik</label><input id=sn maxlength=40><label>PIN (4 sampai 6 angka)</label><input id=s1 type=password inputmode=numeric maxlength=6><label>Ulangi PIN</label><input id=s2 type=password inputmode=numeric maxlength=6><p class=lo>${esc(msg)}</p><button class=w data-a=setup>Mulai pakai</button>`}
+function home(){const td=day(Date.now()),S=D.sales.filter(s=>s.st=='OK'&&day(s.t)==td),P=D.prod.filter(p=>p.on),pend=D.q.filter(x=>x.st=='PENDING').length,top={};
+D.sales.filter(s=>s.st=='OK'&&Date.now()-s.t<2592e6).forEach(s=>s.items.forEach(i=>top[i.n]=(top[i.n]||0)+i.q));
+const tp=Object.entries(top).sort((a,b)=>b[1]-a[1]).slice(0,5),on=navigator.onLine,card=(k,v)=>`<div class=c><div class=k>${k}</div><div class=v>${v}</div></div>`;
+return hd('Halo, '+esc(U.name))+`<div class=c><span class=dot style="background:${on?'var(--g2)':'var(--wn)'}"></span> ${on?'Online':'Offline'}. ${pend} transaksi tersimpan di HP ini, sinkron cloud belum aktif.</div>
+<div class=c><div class=k>Omzet hari ini</div><div class=big>${R(sum(S,'total'))}</div></div>
+<div class=g>${own()?card('Laba kotor',R(sum(S,'total')-sum(S,'cost'))):''}${card('Transaksi',S.length)}${card('Jumlah produk',P.length)}${card('Total stok',sum(P,'stock'))}${card('Stok menipis',P.filter(p=>p.stock>0&&p.stock<=p.min).length)}${card('Stok habis',P.filter(p=>p.stock<=0).length)}</div>
+<h2>Produk terlaris, 30 hari</h2><div class=c>${tp.map(x=>`<div class="r sb"><span>${esc(x[0])}</span><b>${x[1]}</b></div>`).join('')||'<span class=k>Belum ada penjualan.</span>'}</div>
+<h2>Transaksi terakhir</h2><div class=c>${D.sales.slice(-5).reverse().map(s=>`<div class="r sb"><span>${s.inv}</span><b>${R(s.total)}</b></div>`).join('')||'<span class=k>Belum ada transaksi.</span>'}</div>`}
+const match=p=>!q||(p.n+' '+(p.bc||'')).toLowerCase().includes(q.toLowerCase());
+function pl(){const L=D.prod.filter(p=>p.on&&match(p));if(!L.length)return`<p class=k>${D.prod.length?'Tidak ada produk yang cocok.':'Belum ada produk. '+(own()?'Ketuk + di tab Produk untuk menambah.':'Minta pemilik menambahkannya.')}</p>${own()&&tab=='pos'?`<button class=w data-a=padd data-i="${esc(q)}">Tambah produk${q?' ‘'+esc(q)+'’':''}</button>`:''}`;
+return L.map(p=>tab=='pos'?`<div class="c r"><div class=f><b>${esc(p.n)}</b><div class=v>${R(p.sell)}</div><div class="k ${p.stock<=p.min?'lo':''}">${p.stock>0?'Stok '+p.stock+' '+esc(p.unit):'Stok habis'}</div></div><button class=s data-a=add data-i="${p.id}" ${p.stock<=0?'disabled':''} aria-label="Tambah ${esc(p.n)}">+</button></div>`
+:`<div class="c r" ${own()?`data-a=pedit data-i="${p.id}"`:''}><div class=f><b>${esc(p.n)}</b><div class=k>Beli ${R(p.cost)}, jual ${R(p.sell)}${p.cat?', '+esc(p.cat):''}</div></div><div style="text-align:right"><b class="v ${p.stock<=p.min?'lo':''}">${p.stock}</b><div class=k>${esc(p.unit)}</div></div></div>`).join('')}
+function pos(){const n=cart.reduce((a,l)=>a+l.q,0);return hd('Kasir')+`<div class=r><input id=q placeholder="Cari nama atau ketik barcode, lalu Enter" value="${esc(q)}" enterkeyhint=search style="flex:1;min-width:0"><button class=s style="margin-bottom:4px" data-a=scan>Scan</button></div><p class=k style="margin:0 0 6px">Pemindai Bluetooth atau USB juga bisa dipakai: scan kapan saja, barang langsung masuk keranjang.</p>${msg?`<p class=lo>${esc(msg)}</p>`:''}<div id=pl>${pl()}</div>`+(n?`<div class=fx><button class="w r sb" data-a=cart><span>Lihat keranjang (${n} barang)</span><span>${R(sub())}</span></button></div>`:'')}
+function produk(){return hd('Produk')+(own()?`<div class=r style="margin-bottom:8px"><button class=f data-a=pedit data-i="">Tambah produk baru</button><button class="o f" data-a=impick>Impor CSV</button></div><input type=file id=ci accept=".csv,text/csv" hidden><p class=k>Impor CSV: kolom Nama, Barcode, Harga beli, Harga jual, Stok, Satuan, Kategori. Di Excel, simpan sebagai CSV.</p>${msg?`<p class=k><b>${esc(msg)}</b></p>`:''}`:'')+`<input id=q placeholder="Cari nama atau barcode" value="${esc(q)}"><div id=pl>${pl()}</div>`+(own()?`<button class=fx data-a=pedit data-i="" style="left:auto;right:14px;width:60px;height:60px;border-radius:30px;font-size:1.8rem;padding:0" aria-label="Tambah produk">+</button>`:'')}
+function riwayat(){return hd('Riwayat transaksi')+(own()&&D.sales.length?`<button class="o w" style="margin-bottom:10px;color:var(--er);border-color:var(--er)" data-a=rdel>Hapus riwayat transaksi</button>`:'')+(D.sales.slice(-100).reverse().map(s=>`<div class="c r" data-a=sale data-i="${s.id}"><div class=f><b>${s.inv}</b><div class=k>${dt(s.t)}, ${esc(s.cu)}</div><div class=k>${s.sync=='SYNCED'?'Sudah tersinkron':'Tersimpan di HP, menunggu sinkron'}</div></div><b class=v>${R(s.total)}</b></div>`).join('')||'<p class=k>Belum ada transaksi. Transaksi pertama muncul di sini setelah Anda menjual sesuatu di tab Kasir.</p>')}
+function more(){return hd('Lainnya')+`<div class=c><b>${esc(U.name)}</b><div class=k>${own()?'Pemilik toko':'Kasir'}</div></div>`+(own()?`<h2>Laporan penjualan</h2><div class=r><button class="o f" data-a=rep data-i=0>Hari ini</button><button class="o f" data-a=rep data-i=7>7 hari</button><button class="o f" data-a=rep data-i=30>30 hari</button></div><div id=rp class=c style="margin-top:10px"><span class=k>Pilih rentang waktu.</span></div>
+<h2>Toko</h2><label>Nama toko (tampil di struk)</label><input id=sh value="${esc(D.shop)}" maxlength=40><button class="o w" data-a=shop>Simpan nama toko</button>
+<h2>WhatsApp admin (kirim otomatis)</h2><p class=k>Setiap transaksi dikirim otomatis ke WhatsApp admin lewat layanan gateway WhatsApp (contoh: Fonnte). Butuh akun dan token dari penyedia itu.</p><label>Nomor WhatsApp admin</label><input id=wt type=tel inputmode=tel value="${esc(D.wa.to)}" placeholder="0812xxxxxxxx"><label>Token gateway</label><input id=wk type=password value="${esc(D.wa.tok)}" autocomplete=off><label>Alamat API gateway</label><input id=wu value="${esc(D.wa.url)}"><button class="o w" data-a=wasave>Simpan dan kirim pesan tes</button><p class=k>${D.wq.filter(x=>x.st=='PENDING').length} pesan menunggu terkirim. <span id=wm>${esc(wm)}</span></p>
+<h2>Bot Telegram (kirim otomatis)</h2><p class=k>Setiap transaksi berhasil dikirim otomatis ke Telegram. Buat bot lewat @BotFather untuk mendapat token, lalu kirim /start ke bot itu. Chat ID Anda bisa dilihat lewat @userinfobot, atau pakai ID grup yang sudah ditambahi bot.</p><label>Token bot</label><input id=tk type=password value="${esc(D.tg.tok)}" autocomplete=off><label>Chat ID</label><input id=tc value="${esc(D.tg.chat)}" placeholder="123456789"><button class="o w" style="margin-bottom:8px" data-a=tgfind>Cari Chat ID otomatis</button><button class="o w" data-a=tgsave>Simpan dan kirim pesan tes</button><p class=k>${D.tq.filter(x=>x.st=='PENDING').length} pesan menunggu terkirim. <span id=tm>${esc(tm)}</span></p>
+<h2>QRIS toko</h2><p class=k>Unggah foto atau tangkapan layar kode QRIS toko Anda. Gambar ini tampil di Kasir saat pelanggan membayar dengan QRIS.</p>${D.qris?`<img src="${D.qris}" alt="QRIS toko" style="max-width:220px;border-radius:12px"><button class="o w" style="margin:8px 0" data-a=qdel>Hapus QRIS</button>`:''}<input type=file id=qf accept="image/*"><p class=lo id=qm></p>
+<h2>Kasir</h2><label>Nama kasir baru</label><input id=cn maxlength=40><label>PIN kasir (4 sampai 6 angka)</label><input id=cp type=password inputmode=numeric maxlength=6><button class="o w" data-a=adduser>Tambah kasir</button><p class=lo>${esc(msg)}</p>
+<h2>Data</h2><div class=r><button class="o f" data-a=csv>Ekspor CSV</button><button class="o f" data-a=bak>Backup</button></div><label style="display:block;margin-top:10px">Pulihkan dari file backup</label><input type=file id=rs accept=".json">`:'')+`<h2></h2><button class="d w" data-a=out>Keluar</button><p class=k>Sinkron cloud, struk Bluetooth, dan scan kamera belum tersedia di versi web ini.</p>`}
+function render(){const a=E('#app'),n=E('#nv');if(!U){a.innerHTML=auth();n.innerHTML='';return}
+a.innerHTML={home,pos,produk,riwayat,more}[tab]();
+n.innerHTML=[['home','Beranda'],['pos','Kasir'],['produk','Produk'],['riwayat','Riwayat'],['more','Lainnya']].map(t=>`<button class="${tab==t[0]?'on':''}" data-a=tab data-i=${t[0]}>${t[1]}</button>`).join('')}
+function cartH(){const S=sub();return`<div class="r sb"><h1 style="margin:0">Keranjang</h1><button class="o s" data-a=close>Tutup</button></div>`+cart.map(l=>`<div class=c><div class=r><b class=f>${esc(l.n)}</b><button class="o s" data-a=del data-i="${l.id}" aria-label="Hapus">×</button></div><div class=r><button class="o s" data-a=dec data-i="${l.id}">−</button><input style="width:80px;text-align:center;margin:0" inputmode=numeric value="${l.q}" data-q="${l.id}"><button class="o s" data-a=inc data-i="${l.id}">+</button><b class=f style="text-align:right">${R(l.q*l.p)}</b></div>${l.q>l.stock?`<div class=lo>Stok hanya ${l.stock}. Kurangi jumlahnya.</div>`:''}</div>`).join('')+
+`<label>Diskon transaksi (Rp)</label><input id=dc inputmode=numeric value="${disc||''}"><div class="r sb"><span class=k>Subtotal</span><b>${R(S)}</b></div><div class=k>Total belanja</div><div class=big id=tt></div><div class=r style="margin-top:6px"><button class="${pm=='CASH'?'':'o'} f" data-a=meth data-i=CASH>Tunai</button><button class="${pm=='QRIS'?'':'o'} f" data-a=meth data-i=QRIS>QRIS</button></div>${pm=='QRIS'?(D.qris?`<div style="text-align:center;margin:10px 0"><img src="${D.qris}" alt="QRIS toko" style="max-width:100%;max-height:50vh;border-radius:12px"><div class=k>Minta pelanggan memindai, lalu pastikan dana sudah masuk di aplikasi Anda sebelum menekan tombol di bawah.</div></div>`:'<p class=lo>QRIS toko belum dipasang. Pemilik bisa memasangnya di menu Lainnya.</p>'):''}<div style="display:${pm=='CASH'?'block':'none'}"><label>Uang diterima (Rp)</label><input id=pd inputmode=numeric value="${paid||''}"><div class=r><button class="o s f" data-a=cash data-i=0>Uang pas</button>${[20000,50000,100000].map(v=>`<button class="o s f" data-a=cash data-i=${v}>${v/1000}rb</button>`).join('')}</div><div id=kb style="margin:8px 0"></div></div><label>Nomor WhatsApp pelanggan (opsional). Struk otomatis terbuka di WhatsApp setelah bayar</label><input id=wn type=tel inputmode=tel value="${esc(wno)}" placeholder="0812xxxxxxxx"><p class=lo id=em></p><button class=w id=pay data-a=pay>Bayar tunai</button>`}
+function upd(){const t=tot(),k=E('#kb');if(!k)return;E('#tt').textContent=R(t);k.innerHTML=paid>=t?`<div class=k>Kembalian</div><div class=big>${R(paid-t)}</div>`:`<span class=lo>Uang masih kurang ${R(t-paid)}</span>`;E('#pay').textContent=pm=='QRIS'?'Pembayaran QRIS sudah masuk':'Bayar tunai';E('#pay').disabled=!cart.length||(pm=='CASH'&&paid<t)||cart.some(l=>l.q>l.stock)||(pm=='QRIS'&&!D.qris)}
+function openCart(){if(!cart.length){E('#dl').close();render();return}E('#dl').innerHTML=cartH();if(!E('#dl').open)E('#dl').showModal();upd()}
+const rcp=s=>['SMART KASIR PRO',D.shop||'',s.inv,dt(s.t),'Kasir: '+s.cu,'-'.repeat(30),...s.items.flatMap(i=>[i.n,'  '+i.q+' x '+R(i.p)+' = '+R(i.q*i.p)]),'-'.repeat(30),'Total   '+R(s.total),...(s.disc?['Diskon  '+R(s.disc)]:[]),...(s.pay=='QRIS'?['QRIS    '+R(s.total)]:['Tunai   '+R(s.paid),'Kembali '+R(s.paid-s.total)]),'','Terima kasih'].filter(x=>x!==null).join('\n');
+const wnum=v=>{v=String(v||'').replace(/\D/g,'');return v.startsWith('0')?'62'+v.slice(1):v.startsWith('8')?'62'+v:v};
+const waUrl=s=>'https://wa.me/'+wnum(s.wa)+'?text='+encodeURIComponent(rcp(s));
+const RS={s:'rst-abdfee979a03',h:['0b632129311205dfef42374d42863673dda1df528ac50338f52f51ca091b567f','f3078393175']};
+let rf=0,rl=0,sc=null;
+function stopScan(){if(sc){sc.getTracks().forEach(t=>t.stop());sc=null}}
+function gotCode(c){stopScan();E('#dl').close();tab='pos';const p=D.prod.find(x=>x.on&&x.bc==c);q='';msg='';
+if(p&&p.stock>0){A.add({i:p.id});navigator.vibrate&&navigator.vibrate(60)}else if(p){msg=p.n+' stoknya habis.';render()}else{q=c;msg='Barcode '+c+' belum terdaftar.';render()}}
+async function startScan(){const d=E('#dl');
+if(!('BarcodeDetector' in window)||!navigator.mediaDevices){d.innerHTML=hd('Scan barcode')+'<p>Browser ini belum mendukung scan lewat kamera. Pakai Chrome di Android, atau pemindai barcode Bluetooth/USB (hasil scan masuk ke kolom pencarian, lalu Enter).</p><button class=w data-a=close>Tutup</button>';d.showModal();return}
+d.innerHTML=hd('Scan barcode')+'<video id=vd playsinline muted style="width:100%;border-radius:12px;background:#000"></video><p class=k id=sm>Arahkan kamera ke barcode.</p><input type=file id=sf accept="image/*" capture=environment hidden><button class=w data-a=sfpick>Ambil foto barcode</button><button class="o w" style="margin-top:8px" data-a=close>Tutup</button>';d.showModal();
+try{sc=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});const v=E('#vd');v.srcObject=sc;await v.play();
+const det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf','qr_code']});
+while(sc){try{const r=await det.detect(v);if(r.length){gotCode(r[0].rawValue);return}}catch(e){}await new Promise(z=>setTimeout(z,250))}}
+catch(e){const m=E('#sm');if(m){const vv=E('#vd');if(vv)vv.style.display='none';m.textContent='Kamera langsung tidak bisa dibuka ('+(e&&e.name||'error')+'). Halaman yang dibuka dari lampiran WhatsApp tidak boleh memakai kamera. Pakai tombol Ambil foto barcode di bawah, atau buka aplikasi lewat alamat https.'}}}
+const BF=['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf','qr_code'];
+async function decodePhoto(f){const m=E('#sm');if(m)m.textContent='Membaca foto...';
+try{const r=await new BarcodeDetector({formats:BF}).detect(await createImageBitmap(f));
+if(r.length)gotCode(r[0].rawValue);else if(m)m.textContent='Barcode tidak terbaca. Foto lebih dekat, terang, dan sejajar, lalu coba lagi.'}
+catch(e){if(m)m.textContent='Foto tidak bisa dibaca di browser ini.'}}
+function extCode(c){const d=E('#dl');if(d.open){if(d.textContent.includes('Transaksi tersimpan'))d.close();else if(!E('#tt'))return}
+const p=D.prod.find(x=>x.on&&x.bc==c);tab='pos';q='';
+if(p&&p.stock>0){A.add({i:p.id});if(E('#tt'))openCart();navigator.vibrate&&navigator.vibrate(60)}else{q=c;msg=p?p.n+' stoknya habis.':'Barcode '+c+' belum terdaftar.';render()}}
+let bb='',bt=0;
+document.addEventListener('keydown',e=>{if(!U||e.ctrlKey||e.altKey||e.metaKey)return;const el=e.target,now=Date.now(),inp=/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+if(e.key=='Enter'||e.key=='Tab'){const c=bb,fast=now-bt<100;bb='';if(c.length>=4&&fast&&!inp){e.preventDefault();extCode(c)}return}
+if(e.key.length==1){if(now-bt>100)bb='';bb+=e.key;bt=now}});
+function csvImp(txt){const ls=txt.replace(/^\uFEFF/,'').replace(/\r/g,'').split('\n').filter(x=>x.trim());if(!ls.length)return'File kosong.';const sp=ls[0].includes(';')?';':',';let ok=0,sk=0;
+ls.forEach((l,i)=>{const c=l.split(sp).map(x=>x.trim().replace(/^"|"$/g,''));if(i==0&&isNaN(parseInt(c[3])))return;
+const n=c[0],bc=c[1]||'',sell=parseInt(c[3])||0,stock=Math.max(0,parseInt(c[4])||0);
+if(!n||!sell||(bc&&D.prod.some(x=>x.on&&x.bc==bc))){sk++;return}
+const cat=c[6]||'';if(cat&&!D.cats.includes(cat))D.cats.push(cat);
+const p={id:uid(),on:true,n,bc,cost:parseInt(c[2])||0,sell,stock,unit:c[5]||'pcs',min:5,cat};D.prod.push(p);
+if(stock)D.mov.push({id:uid(),pid:p.id,type:'INITIAL',d:stock,after:stock,dev:D.dev,t:Date.now()});
+D.q.push({id:uid(),type:'PRODUCT',eid:p.id,st:'PENDING',t:Date.now()});ok++});
+lg('PRODUCT_IMPORT',ok+' produk');save();return ok+' produk ditambahkan, '+sk+' dilewati (nama kosong, harga jual kosong, atau barcode sudah ada).'}
+function qrisLoad(f){const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const k=Math.min(1,800/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);D.qris=c.toDataURL('image/jpeg',0.9);lg('QRIS_SET','');save();render()};im.onerror=()=>{E('#qm').textContent='Gambar tidak bisa dibaca. Coba foto atau tangkapan layar lain.'};im.src=u}
+let tf=false;
+async function tgFlush(){const g=D.tg;if(tf||!g.tok||!g.chat||!navigator.onLine)return;tf=true;
+for(const m of D.tq.filter(x=>x.st=='PENDING')){try{const r=await fetch('https://api.telegram.org/bot'+g.tok+'/sendMessage',{method:'POST',body:new URLSearchParams({chat_id:g.chat,text:m.msg})});
+const j=await r.json().catch(()=>({}));if(!r.ok||j.ok!==true)throw new Error(j.description||'gagal');m.st='SENT';tm='Terkirim ke Telegram.'}catch(e){tm='Belum terkirim: '+(e&&e.message&&e.message!='Failed to fetch'?e.message:'periksa token, Chat ID, dan internet')+'. Pesan tetap antre dan dicoba lagi.';break}}
+D.tq=D.tq.filter(x=>x.st!='SENT');save();tf=false;const e=E('#tm');if(e)e.textContent=tm}
+let fl=false;
+async function flush(){const w=D.wa;if(fl||!w.tok||!w.to||!navigator.onLine)return;fl=true;
+for(const m of D.wq.filter(x=>x.st=='PENDING')){try{const r=await fetch(w.url,{method:'POST',headers:{Authorization:w.tok},body:new URLSearchParams({target:m.to,message:m.msg})});
+const j=await r.json().catch(()=>({}));if(!r.ok||j.status===false)throw 0;m.st='SENT';wm='Terkirim ke WhatsApp admin.'}catch(e){wm='Belum terkirim. Periksa token, alamat API, dan internet. Pesan tetap antre dan dicoba lagi.';break}}
+D.wq=D.wq.filter(x=>x.st!='SENT');save();fl=false;const e=E('#wm');if(e)e.textContent=wm}
+function done(s){E('#dl').innerHTML=hd('Transaksi tersimpan')+`<div class=k>${s.inv}</div>${s.pay=='QRIS'?'<div class=k>Dibayar lewat QRIS, dikonfirmasi manual oleh kasir</div><div class=big>'+R(s.total)+'</div>':'<div class=k>Kembalian</div><div class=big>'+R(s.paid-s.total)+'</div>'}<label>Nomor WhatsApp pelanggan</label><input id=wn2 type=tel inputmode=tel value="${esc(s.wa)}" placeholder="0812xxxxxxxx"><div class=r style="margin:4px 0 12px"><button class="o f" data-a=print data-i="${s.id}">Cetak struk</button><button class=f data-a=wa data-i="${s.id}">Kirim ke WhatsApp</button></div><button class=w data-a=close>Transaksi baru</button>`;if(!E('#dl').open)E('#dl').showModal()}
+function pay(){const t=tot(),qr=pm=='QRIS';if(!qr&&paid<t)return;
+for(const l of cart){const p=D.prod.find(x=>x.id==l.id);if(!p||p.stock<l.q){E('#em').textContent='Stok '+l.n+' tidak cukup.';return}}
+const id=sid||(sid=uid());if(D.sales.some(s=>s.id==id))return;
+const now=Date.now(),n=D.sales.filter(s=>day(s.t)==day(now)).length+1,inv='INV-'+day(now).replaceAll('-','')+'-'+D.dev+'-'+String(n).padStart(4,'0');
+const s={id,inv,dev:D.dev,cid:U.id,cu:U.name,sub:sub(),disc:Math.min(disc,sub()),total:t,cost:cart.reduce((a,l)=>a+l.q*l.c,0),pay:pm,ps:'PAID',pv:!qr,paid:qr?t:paid,st:'OK',t:now,iso:iso(now),sync:'PENDING',wa:wnum(wno),items:cart.map(l=>({pid:l.id,n:l.n,p:l.p,c:l.c,q:l.q}))};
+cart.forEach(l=>{const p=D.prod.find(x=>x.id==l.id);p.stock-=l.q;D.mov.push({id:uid(),pid:p.id,type:'SALE',d:-l.q,after:p.stock,ref:id,dev:D.dev,t:now})});
+D.sales.push(s);D.q.push({id:uid(),type:'SALE',eid:id,st:'PENDING',t:now});lg('SALE_CREATE',inv+'; total='+t+'; '+pm+(qr?' (dikonfirmasi manual oleh kasir, belum diverifikasi penyedia)':''));if(D.tg.tok&&D.tg.chat)D.tq.push({id:uid(),sid:id,msg:'Transaksi berhasil\n'+rcp(s)+(qr?'\nCatatan: QRIS, dikonfirmasi manual oleh kasir':''),st:'PENDING'});if(D.wa.to&&D.wa.tok)D.wq.push({id:uid(),sid:id,to:wnum(D.wa.to),msg:'Transaksi baru\n'+rcp(s),st:'PENDING'});save();
+cart=[];disc=0;paid=0;sid=null;wno='';pm='CASH';done(s);render();flush();tgFlush();if(s.wa)open(waUrl(s))}
+function pform(p){p=p||{};return`<h1>${p.id?'Ubah produk':'Tambah produk'}</h1><label>Nama produk</label><input id=pn value="${esc(p.n)}" maxlength=60><label>Barcode (opsional)</label><input id=pb value="${esc(p.bc)}" inputmode=numeric maxlength=32><label>Harga beli (modal)</label><input id=pc inputmode=numeric value="${p.cost??''}"><label>Harga jual</label><input id=ps inputmode=numeric value="${p.sell??''}"><div class=r><div class=f><label>Stok</label><input id=pt inputmode=numeric value="${p.stock??0}"></div><div class=f><label>Satuan</label><input id=pu value="${esc(p.unit||'pcs')}" maxlength=10></div></div><label>Stok minimum (pengingat)</label><input id=pm inputmode=numeric value="${p.min??5}"><label>Kategori</label><select id=pk><option value="">Tanpa kategori</option>${D.cats.map(c=>`<option ${c==p.cat?'selected':''}>${esc(c)}</option>`).join('')}</select><label>Kategori baru (opsional)</label><input id=pk2 maxlength=30><p class=lo id=em></p><button class=w data-a=psave data-i="${p.id||''}">Simpan produk</button>${p.id?'':`<button class="o w" style="margin-top:8px" data-a=psave2 data-i="">Simpan dan tambah lagi</button>`}${p.id?`<button class="o w" style="margin-top:8px;color:var(--er);border-color:var(--er)" data-a=poff data-i="${p.id}">Nonaktifkan produk</button>`:''}<button class="o w" style="margin-top:8px" data-a=close>Batal</button>`}
+const num=s=>Math.max(0,parseInt(String(E(s).value).replace(/\D/g,''))||0);
+function psave(id,again){const n=E('#pn').value.trim(),bc=E('#pb').value.trim(),o=id&&D.prod.find(x=>x.id==id),er=m=>E('#em').textContent=m;
+if(!n)return er('Isi nama produk.');if(!num('#ps'))return er('Harga jual harus lebih dari 0.');
+const dup=bc&&D.prod.find(x=>x.on&&x.bc==bc&&x.id!=id);if(dup)return er('Barcode ini sudah dipakai produk '+dup.n+'.');
+const p=o||{id:uid(),on:true};const old=o?{...o}:null;Object.assign(p,{n,bc,cost:num('#pc'),sell:num('#ps'),stock:num('#pt'),unit:E('#pu').value.trim()||'pcs',min:num('#pm'),cat:E('#pk2').value.trim()||E('#pk').value,on:true});if(p.cat&&!D.cats.includes(p.cat))D.cats.push(p.cat);
+if(!o)D.prod.push(p);const d=p.stock-(old?old.stock:0);
+if(d)D.mov.push({id:uid(),pid:p.id,type:old?'ADJUSTMENT':'INITIAL',d,after:p.stock,dev:D.dev,t:Date.now()});
+if(old&&(old.sell!=p.sell||old.cost!=p.cost))lg('PRICE_CHANGE',n+': jual '+old.sell+'->'+p.sell+', modal '+old.cost+'->'+p.cost);
+lg(old?'PRODUCT_UPDATE':'PRODUCT_CREATE',n);D.q.push({id:uid(),type:'PRODUCT',eid:p.id,st:'PENDING',t:Date.now()});save();E('#dl').close();render();if(again)A.pedit({i:''})}
+function dl(name,type,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+const A={
+async login(){if(Date.now()<lock){msg='Terlalu banyak PIN salah. Coba lagi sebentar.';return render()}
+const u=D.users.find(x=>x.id==E('#lu').value);if(u&&await hp(E('#lp').value,u.salt)==u.hash){U=u;fails=0;msg='';tab='home'}else{if(++fails>=5){lock=Date.now()+3e4;fails=0}msg='PIN salah. Periksa lalu coba lagi.'}render()},
+async setup(){const n=E('#sn').value.trim(),p=E('#s1').value;if(!n)msg='Isi nama pemilik.';else if(!/^\d{4,6}$/.test(p))msg='PIN harus 4 sampai 6 angka.';else if(p!=E('#s2').value)msg='Kedua PIN belum sama.';else{const salt=uid();U={id:uid(),name:n,role:'owner',salt,hash:await hp(p,salt)};D.users.push(U);save();msg=''}render()},
+tab(d){tab=d.i;q='';msg='';render()},
+add(d){const p=D.prod.find(x=>x.id==d.i),l=cart.find(x=>x.id==p.id);l?l.q++:cart.push({id:p.id,n:p.n,p:p.sell,c:p.cost,q:1,stock:p.stock});msg='';render()},
+cart(){openCart()},close(){E('#dl').close()},
+inc(d){cart.find(x=>x.id==d.i).q++;openCart()},dec(d){const l=cart.find(x=>x.id==d.i);if(--l.q<1)cart=cart.filter(x=>x!=l);openCart();render()},
+del(d){cart=cart.filter(x=>x.id!=d.i);openCart();render()},
+cash(d){paid=+d.i||tot();E('#pd').value=paid;upd()},pay,
+print(d){E('#rcp').textContent=rcp(D.sales.find(s=>s.id==d.i));print()},
+wa(d){const s=D.sales.find(x=>x.id==d.i),n=E('#wn2');if(n){s.wa=wnum(n.value);save()}open(waUrl(s))},
+pedit(d){E('#dl').innerHTML=pform(D.prod.find(x=>x.id==d.i));E('#dl').showModal()},
+psave(d){psave(d.i)},psave2(d){psave(d.i,true)},impick(){E('#ci').click()},padd(d){const v=d.i||'',g=/^\d{6,}$/.test(v);E('#dl').innerHTML=pform({n:g?'':v,bc:g?v:''});E('#dl').showModal()},poff(d){if(!confirm('Nonaktifkan produk ini? Riwayat transaksi tetap tersimpan.'))return;const p=D.prod.find(x=>x.id==d.i);p.on=false;lg('PRODUCT_DEACTIVATE',p.n);D.q.push({id:uid(),type:'PRODUCT',eid:p.id,st:'PENDING',t:Date.now()});save();E('#dl').close();render()},
+sale(d){const s=D.sales.find(x=>x.id==d.i);E('#dl').innerHTML=hd(s.inv)+`<div class=k>${dt(s.t)}, kasir ${esc(s.cu)}</div>`+s.items.map(i=>`<div class="r sb"><span>${i.q} x ${esc(i.n)}</span><b>${R(i.q*i.p)}</b></div>`).join('')+`<hr>${s.disc?`<div class="r sb"><span>Diskon</span><b>-${R(s.disc)}</b></div>`:''}<div class="r sb"><span>Total</span><b>${R(s.total)}</b></div><div class="r sb"><span>${s.pay=='QRIS'?'QRIS (konfirmasi manual)':'Tunai'}</span><b>${R(s.paid)}</b></div>${s.pay=='QRIS'?'':`<div class="r sb"><span>Kembalian</span><b>${R(s.paid-s.total)}</b></div>`}<label>Nomor WhatsApp pelanggan</label><input id=wn2 type=tel inputmode=tel value="${esc(s.wa)}" placeholder="0812xxxxxxxx"><div class=r style="margin:4px 0 12px"><button class="o f" data-a=print data-i="${s.id}">Cetak ulang</button><button class=f data-a=wa data-i="${s.id}">Kirim ke WhatsApp</button></div><button class=w data-a=close>Tutup</button>`;E('#dl').showModal()},
+rep(d){const from=day(Date.now()-(+d.i)*864e5),S=D.sales.filter(s=>s.st=='OK'&&day(s.t)>=from),it=S.flatMap(s=>s.items);E('#rp').innerHTML=[['Omzet',R(sum(S,'total'))],['Modal barang terjual',R(sum(S,'cost'))],['Laba kotor',R(sum(S,'total')-sum(S,'cost'))],['Diskon',R(sum(S,'disc'))],['Transaksi',S.length],['Barang terjual',sum(it,'q')]].map(x=>`<div class="r sb"><span class=k>${x[0]}</span><b>${x[1]}</b></div>`).join('')},
+wasave(){const w=D.wa;w.to=E('#wt').value.trim();w.tok=E('#wk').value.trim();w.url=E('#wu').value.trim()||'https://api.fonnte.com/send';
+if(w.to&&w.tok){D.wq.push({id:uid(),to:wnum(w.to),msg:'Tes Smart Kasir Pro: koneksi WhatsApp berhasil.',st:'PENDING'});wm='Disimpan. Pesan tes sedang dikirim.'}else wm='Isi nomor admin dan token dulu.';save();render();flush()},
+async tgfind(){const k=E('#tk').value.trim();if(!k){E('#tm').textContent='Isi token bot dulu.';return}
+try{const r=await fetch('https://api.telegram.org/bot'+k+'/getUpdates'),j=await r.json(),u=(j.result||[]).reverse().find(x=>x.message||x.channel_post||x.my_chat_member),c=u&&(u.message||u.channel_post||u.my_chat_member).chat;
+if(c){E('#tc').value=c.id;tm='Chat ID ditemukan: '+c.id+'. Tekan Simpan dan kirim pesan tes.'}else tm='Belum ada pesan. Kirim /start ke bot Anda di Telegram, lalu coba lagi.'}catch(e){tm='Gagal menghubungi Telegram. Periksa token dan internet.'}E('#tm').textContent=tm},
+tgsave(){const g=D.tg;g.tok=E('#tk').value.trim();g.chat=E('#tc').value.trim();if(g.tok&&g.chat){D.tq.push({id:uid(),msg:'Tes Smart Kasir Pro: koneksi Telegram berhasil.',st:'PENDING'});tm='Disimpan. Pesan tes sedang dikirim.'}else tm='Isi token bot dan Chat ID dulu.';save();render();tgFlush()},
+qdel(){D.qris='';save();render()},scan(){startScan()},sfpick(){E('#sf').click()},
+rdel(){E('#dl').innerHTML=hd('Hapus riwayat transaksi')+`<p>Ini menghapus <b>${D.sales.length} transaksi</b> dari HP ini dan tidak bisa dibatalkan. Stok barang tidak berubah. Sebaiknya ekspor CSV dulu di menu Lainnya.</p><label>Password reset riwayat (berbeda dari PIN masuk)</label><input id=rpw type=password autocomplete=off><p class=lo id=em></p><button class="d w" data-a=rgo>Hapus semua riwayat</button><button class="o w" style="margin-top:8px" data-a=close>Batal</button>`;E('#dl').showModal()},
+async rgo(){const em=E('#em');if(Date.now()<rl){em.textContent='Terlalu banyak percobaan salah. Coba lagi sebentar.';return}
+if(!RS.h.includes(await hp(E('#rpw').value,RS.s))){if(++rf>=3){rl=Date.now()+6e4;rf=0}em.textContent='Password salah.';return}
+rf=0;const n=D.sales.length,v=sum(D.sales,'total');D.sales=[];D.q=D.q.filter(x=>x.type!='SALE');lg('HISTORY_RESET',n+' transaksi, omzet '+v);
+if(D.tg.tok&&D.tg.chat)D.tq.push({id:uid(),msg:'Riwayat transaksi dihapus oleh '+U.name+': '+n+' transaksi, omzet '+R(v)+'.',st:'PENDING'});
+save();E('#dl').close();render();tgFlush()},meth(d){pm=d.i;openCart()},
+shop(){D.shop=E('#sh').value.trim();save();msg='';render()},
+async adduser(){const n=E('#cn').value.trim(),p=E('#cp').value;if(!n)msg='Isi nama kasir.';else if(!/^\d{4,6}$/.test(p))msg='PIN kasir harus 4 sampai 6 angka.';else{const salt=uid();D.users.push({id:uid(),name:n,role:'cashier',salt,hash:await hp(p,salt)});lg('USER_ADD',n);save();msg='Kasir '+n+' ditambahkan.'}render()},
+csv(){dl('transaksi.csv','text/csv','Invoice,Waktu,Kasir,Total,Modal,Diskon\n'+D.sales.map(s=>[s.inv,s.iso,'"'+s.cu.replace(/"/g,'""')+'"',s.total,s.cost,s.disc].join(',')).join('\n'))},
+bak(){dl('backup-smart-kasir-'+day(Date.now())+'.json','application/json',JSON.stringify({...D,wa:{...D.wa,tok:''},tg:{...D.tg,tok:''}}))},
+out(){U=null;cart=[];disc=0;paid=0;render()}};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b&&A[b.dataset.a])A[b.dataset.a](b.dataset)});
+document.addEventListener('input',e=>{const t=e.target;if(t.id=='q'){q=t.value;E('#pl').innerHTML=pl()}else if(t.id=='dc'){disc=+t.value.replace(/\D/g,'')||0;upd()}else if(t.id=='pd'){paid=+t.value.replace(/\D/g,'')||0;upd()}else if(t.id=='wn')wno=t.value});
+document.addEventListener('change',e=>{const t=e.target;if(t.dataset.q){const l=cart.find(x=>x.id==t.dataset.q),n=parseInt(t.value);if(n>0)l.q=Math.min(n,9999);openCart();render()}
+else if(t.id=='qf'&&t.files[0])qrisLoad(t.files[0]);else if(t.id=='sf'&&t.files[0])decodePhoto(t.files[0]);else if(t.id=='ci'&&t.files[0])t.files[0].text().then(x=>{msg=csvImp(x);render()});else if(t.id=='rs'&&t.files[0]){t.files[0].text().then(x=>{try{const j=JSON.parse(x);if(!Array.isArray(j.prod)||!Array.isArray(j.sales)||!Array.isArray(j.users))throw 0;if(confirm('Ganti semua data di HP ini dengan isi backup?')){D=j;D.tg=D.tg||{tok:'',chat:''};D.tq=D.tq||[];D.qris=D.qris||'';D.wa=D.wa||{url:'https://api.fonnte.com/send',tok:'',to:''};D.wq=D.wq||[];save();U=null;render()}}catch(_){msg='File backup tidak valid.';render()}})}});
+document.addEventListener('keydown',e=>{if(e.key=='Enter'&&e.target.id=='q'&&tab=='pos'){const p=D.prod.find(x=>x.on&&x.bc&&x.bc==q.trim());if(p){A.add({i:p.id});q='';render()}else if(q.trim()){msg='Barcode '+q.trim()+' belum terdaftar. Tambahkan di tab Produk.';render()}}});
+addEventListener('online',()=>{render();flush();tgFlush()});addEventListener('offline',render);E('#dl').addEventListener('close',()=>{stopScan();render()});
+render();flush();tgFlush();
+</script></body></html>
